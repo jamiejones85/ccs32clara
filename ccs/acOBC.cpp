@@ -142,7 +142,24 @@ uint8_t acOBC_getRGB(void)
 #define GREEN 2
 #define BLUE 4
     cycleDivider++;
-    if (previousStateBasicAcCharging == OBC_LOCK)
+
+    if (previousStateBasicAcCharging == OBC_IDLE)
+    {
+        if (cycleDivider & 2)
+        {
+            rgb = BLUE;
+        }
+        else
+        {
+            rgb = 0;
+        }
+    }
+    else if (previousStateBasicAcCharging == OBC_LOCK)
+    {
+
+        rgb = BLUE;
+    }
+    else if (previousStateBasicAcCharging == OBC_CHARGE)
     {
         if (cycleDivider & 2)
         {
@@ -152,10 +169,6 @@ uint8_t acOBC_getRGB(void)
         {
             rgb = 0;
         }
-    }
-    else if (previousStateBasicAcCharging == OBC_CHARGE)
-    {
-        rgb = BLUE;
     }
     else if (previousStateBasicAcCharging == OBC_COMPLETE)
     {
@@ -332,6 +345,22 @@ static void triggerActions()
     }
     else
     {
+        uint8_t cpDuty_Percent = (uint8_t)Param::GetFloat(Param::ControlPilotDuty);
+        if(cpDuty_Percent<3)
+        {
+            Param::SetInt(Param::PortState,0x1); //set PortState to Plugged In due to dropping way of valid CP - !!!Should not interfere with CCS charging
+            if (Param::GetInt(Param::LockState) == LOCK_CLOSED && Param::GetInt(Param::AllowUnlock) == 1)//only unlock if allowed and lock is locked
+            {
+                if(Param::GetInt(Param::ActuatorTest) == 0)
+                {
+                    hardwareInterface_triggerConnectorUnlocking();
+                }
+            }
+        }
+        else if(Param::GetFloat(Param::CableCurrentLimit) < 1)
+        {
+            Param::SetInt(Param::PortState,0x0); //set PortState to Idle NO PP or CP present thus unplugged
+        }
         //!!! CHECK IF NOT DC CHARGING this will be ran every 100ms
         /* Todo: maybe need some cleanup actions here, if we left the AC charging. E.g. unlocking the connector? */
         /* Todo: how do we exit AC charging?
